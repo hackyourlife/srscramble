@@ -166,8 +166,8 @@ int main(int argc, char** argv)
 
 	//////////////////////////////////////////////
 	// descramble the whole ROM
-	if(width == 8) {
-		// performance improvement: descramble 16bit words
+	if(width == 16) {
+		// performance improvement: scramble 16bit words
 		// this saves half of the address scrambling operations
 		u16* buf16 = (u16*) buf;
 		u16* outbuf16 = (u16*) outbuf;
