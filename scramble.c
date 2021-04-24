@@ -8,54 +8,66 @@ typedef uint8_t		u8;
 typedef uint16_t	u16;
 typedef uint32_t	u32;
 
-u16 data_scramble_tbl[17] = { 4, 1, 0x10, 0x20, 0x80, 0x40, 0x8, 0x2, 0x400,
-		0x100, 0x1000, 0x2000, 0x8000, 0x4000, 0x800, 0x200, 0 };
-u32 addr_scramble_tbl_16[19] = { 1, 0x10, 4, 8, 2, 0x2000, 0x80, 0x1000, 0x20,
-		0x400, 0x10000, 0x200, 0x40, 0x100, 0x4000, 0x20000, 0x800,
-		0x8000, 0 };
-u32 addr_scramble_tbl_8[20] = { 4, 1, 8, 0x10, 0x2, 0x200, 0x2000, 0x400,
-		0x40000, 0x20000, 0x40, 0x8000, 0x800, 0x10000, 0x100, 0x20,
-		0x1000, 0x80, 0x4000, 0 };
-
 u16 scramble_data(u16 word)
 {
-	u16 out = 0;
-	u16 mask = 0xFFFF;
-	u16* scramble = data_scramble_tbl;
-	u16 bit = 1;
-
-	while(*scramble) {
-		if((word & bit) != 0)
-			out |= *scramble;
-		scramble++;
-		bit <<= 1;
-		mask <<= 1;
-	}
-
-	return out | mask & word;
+	return    (word & 0x0001) << 2
+		| (word & 0x0002) >> 1
+		| (word & 0x0004) << 2
+		| (word & 0x0008) << 2
+		| (word & 0x0010) << 3
+		| (word & 0x0020) << 1
+		| (word & 0x0040) >> 3
+		| (word & 0x0080) >> 6
+		| (word & 0x0100) << 2
+		| (word & 0x0200) >> 1
+		| (word & 0x0400) << 2
+		| (word & 0x0800) << 2
+		| (word & 0x1000) << 3
+		| (word & 0x2000) << 1
+		| (word & 0x4000) >> 3
+		| (word & 0x8000) >> 6;
 }
 
 u32 scramble_addr(u32 addr, int width)
 {
-	u32* scramble;
-	u32 out = 0;
-	u32 mask = 0xFFFFFFFF;
-	u32 bit = 1;
-
-	if(width == 8)
-		scramble = addr_scramble_tbl_8;
-	else
-		scramble = addr_scramble_tbl_16;
-
-	while(*scramble) {
-		if((addr & bit) != 0)
-			out |= *scramble;
-		scramble++;
-		bit <<= 1;
-		mask <<= 1;
+	if(width == 8) {
+		return    (addr & 0x00000001) << 2
+			| (addr & 0x00000002) >> 1
+			| (addr & 0x00000004) << 1
+			| (addr & 0x00000008) << 1
+			| (addr & 0x00000010) >> 3
+			| (addr & 0x00000020) << 4
+			| (addr & 0x00000040) << 7
+			| (addr & 0x00000080) << 3
+			| (addr & 0x00000100) << 10
+			| (addr & 0x00000200) << 8
+			| (addr & 0x00000400) >> 4
+			| (addr & 0x00000800) << 4
+			| (addr & 0x00001000) >> 1
+			| (addr & 0x00002000) << 3
+			| (addr & 0x00004000) >> 6
+			| (addr & 0x00008000) >> 10
+			| (addr & 0x00010000) >> 4
+			| (addr & 0x00020000) >> 10
+			| (addr & 0x00040000) >> 4
+			| (addr & 0xFFF80000);
+	} else {
+		return    (addr & 0x00000002) << 3
+			| (addr & 0x00000010) >> 3
+			| (addr & 0x00000020) << 8
+			| (addr & 0x00000040) << 1
+			| (addr & 0x00000080) << 5
+			| (addr & 0x00000100) >> 3
+			| (addr & 0x00000200) << 1
+			| (addr & 0x00000400) << 6
+			| (addr & 0x00000800) >> 2
+			| (addr & 0x00001000) >> 6
+			| (addr & 0x00002000) >> 5
+			| (addr & 0x00008000) << 2
+			| (addr & 0x00010000) >> 5
+			| (addr & 0x00020000) >> 2
+			| (addr & 0xFFFC400D);
 	}
-
-	return out | addr & mask;
 }
 
 int main(int argc, char** argv)
@@ -88,7 +100,7 @@ int main(int argc, char** argv)
 	const char* type;
 
 	// figure out ROM type: scramble first 32 bytes
-	for(size_t i = 0; i < fsize; i++) {
+	for(size_t i = 0; i < 32; i++) {
 		u32 addr = scramble_addr(i, 8);
 		u16 tmp = scramble_data(buf[i]);
 		outbuf[addr] = tmp;
@@ -97,7 +109,7 @@ int main(int argc, char** argv)
 	if(strncmp(outbuf, "Roland", 6)) {
 		if(strncmp(outbuf, "JP-800", 6)) {
 			// try again with 16bit
-			for(size_t i = 0; i < fsize; i++) {
+			for(size_t i = 0; i < 32; i++) {
 				u32 addr = scramble_addr(i, 16);
 				u16 tmp = scramble_data(buf[i]);
 				outbuf[addr] = tmp;
@@ -154,10 +166,23 @@ int main(int argc, char** argv)
 
 	//////////////////////////////////////////////
 	// descramble the whole ROM
-	for(size_t i = 0; i < fsize; i++) {
-		u32 addr = scramble_addr(i, width);
-		u16 tmp = scramble_data(buf[i]);
-		outbuf[addr] = tmp;
+	if(width == 8) {
+		// performance improvement: descramble 16bit words
+		// this saves half of the address scrambling operations
+		u16* buf16 = (u16*) buf;
+		u16* outbuf16 = (u16*) outbuf;
+		for(size_t i = 0; i < fsize; i += 2) {
+			u32 addr = scramble_addr(i, width);
+			u16 tmp = scramble_data(buf16[i >> 1]);
+			outbuf16[addr >> 1] = tmp;
+		}
+	} else {
+		// no optimization for 8bit ROMs, because A[0] is scrambled too
+		for(size_t i = 0; i < fsize; i++) {
+			u32 addr = scramble_addr(i, width);
+			u16 tmp = scramble_data(buf[i]);
+			outbuf[addr] = tmp;
+		}
 	}
 	//////////////////////////////////////////////
 
