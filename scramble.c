@@ -8,7 +8,19 @@ typedef uint8_t		u8;
 typedef uint16_t	u16;
 typedef uint32_t	u32;
 
-u16 scramble_data(u16 word)
+u8 scramble_data8(u8 word)
+{
+	return    (word & 0x0001) << 2
+		| (word & 0x0002) >> 1
+		| (word & 0x0004) << 2
+		| (word & 0x0008) << 2
+		| (word & 0x0010) << 3
+		| (word & 0x0020) << 1
+		| (word & 0x0040) >> 3
+		| (word & 0x0080) >> 6;
+}
+
+u16 scramble_data16(u16 word)
 {
 	return    (word & 0x0001) << 2
 		| (word & 0x0002) >> 1
@@ -102,7 +114,7 @@ int main(int argc, char** argv)
 	// figure out ROM type: scramble first 32 bytes
 	for(size_t i = 0; i < 32; i++) {
 		u32 addr = scramble_addr(i, 8);
-		u16 tmp = scramble_data(buf[i]);
+		u16 tmp = scramble_data8(buf[i]);
 		outbuf[addr] = tmp;
 	}
 
@@ -111,7 +123,7 @@ int main(int argc, char** argv)
 			// try again with 16bit
 			for(size_t i = 0; i < 32; i++) {
 				u32 addr = scramble_addr(i, 16);
-				u16 tmp = scramble_data(buf[i]);
+				u16 tmp = scramble_data16(buf[i]);
 				outbuf[addr] = tmp;
 			}
 			if(!strncmp(outbuf, "Roland", 6) &&
@@ -173,14 +185,14 @@ int main(int argc, char** argv)
 		u16* outbuf16 = (u16*) outbuf;
 		for(size_t i = 0; i < fsize; i += 2) {
 			u32 addr = scramble_addr(i, width);
-			u16 tmp = scramble_data(buf16[i >> 1]);
+			u16 tmp = scramble_data16(buf16[i >> 1]);
 			outbuf16[addr >> 1] = tmp;
 		}
 	} else {
 		// no optimization for 8bit ROMs, because A[0] is scrambled too
 		for(size_t i = 0; i < fsize; i++) {
 			u32 addr = scramble_addr(i, width);
-			u16 tmp = scramble_data(buf[i]);
+			u16 tmp = scramble_data8(buf[i]);
 			outbuf[addr] = tmp;
 		}
 	}

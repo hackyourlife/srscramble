@@ -8,7 +8,19 @@ typedef uint8_t		u8;
 typedef uint16_t	u16;
 typedef uint32_t	u32;
 
-u16 descramble_data(u16 word)
+u8 descramble_data8(u8 word)
+{
+	return    (word & 0x0002) << 6
+		| (word & 0x0008) << 3
+		| (word & 0x0040) >> 1
+		| (word & 0x0080) >> 3
+		| (word & 0x0020) >> 2
+		| (word & 0x0010) >> 2
+		| (word & 0x0001) << 1
+		| (word & 0x0004) >> 2;
+}
+
+u16 descramble_data16(u16 word)
 {
 	return    (word & 0x0002) << 6
 		| (word & 0x0008) << 3
@@ -133,14 +145,14 @@ int main(int argc, char** argv)
 		u16* outbuf16 = (u16*) outbuf;
 		for(size_t i = 0; i < fsize; i += 2) {
 			u32 addr = descramble_addr(i, width);
-			u16 tmp = descramble_data(buf16[i >> 1]);
+			u16 tmp = descramble_data16(buf16[i >> 1]);
 			outbuf16[addr >> 1] = tmp;
 		}
 	} else {
 		// no optimization for 8bit ROMs, because A[0] is scrambled too
 		for(size_t i = 0; i < fsize; i++) {
 			u32 addr = descramble_addr(i, width);
-			u16 tmp = descramble_data(buf[i]);
+			u16 tmp = descramble_data8(buf[i]);
 			outbuf[addr] = tmp;
 		}
 	}
