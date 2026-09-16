@@ -8,78 +8,56 @@ typedef uint8_t		u8;
 typedef uint16_t	u16;
 typedef uint32_t	u32;
 
-u8 scramble_data8(u8 word)
+static inline u8 scramble_data8(const u8 word)
 {
-	return    (word & 0x0001) << 2
+	return    (word & 0x000D) << 2
 		| (word & 0x0002) >> 1
-		| (word & 0x0004) << 2
-		| (word & 0x0008) << 2
 		| (word & 0x0010) << 3
 		| (word & 0x0020) << 1
 		| (word & 0x0040) >> 3
 		| (word & 0x0080) >> 6;
 }
 
-u16 scramble_data16(u16 word)
+static inline u16 scramble_data16(const u16 word)
 {
-	return    (word & 0x0001) << 2
-		| (word & 0x0002) >> 1
-		| (word & 0x0004) << 2
-		| (word & 0x0008) << 2
-		| (word & 0x0010) << 3
-		| (word & 0x0020) << 1
-		| (word & 0x0040) >> 3
-		| (word & 0x0080) >> 6
-		| (word & 0x0100) << 2
-		| (word & 0x0200) >> 1
-		| (word & 0x0400) << 2
-		| (word & 0x0800) << 2
-		| (word & 0x1000) << 3
-		| (word & 0x2000) << 1
-		| (word & 0x4000) >> 3
-		| (word & 0x8000) >> 6;
+	return    (word & 0x0D0D) << 2
+		| (word & 0x0202) >> 1
+		| (word & 0x1010) << 3
+		| (word & 0x2020) << 1
+		| (word & 0x4040) >> 3
+		| (word & 0x8080) >> 6;
 }
 
-u32 scramble_addr(u32 addr, int width)
+static inline u32 scramble_addr8(const u32 addr)
 {
-	if(width == 8) {
-		return    (addr & 0x00000001) << 2
-			| (addr & 0x00000002) >> 1
-			| (addr & 0x00000004) << 1
-			| (addr & 0x00000008) << 1
-			| (addr & 0x00000010) >> 3
-			| (addr & 0x00000020) << 4
-			| (addr & 0x00000040) << 7
-			| (addr & 0x00000080) << 3
-			| (addr & 0x00000100) << 10
-			| (addr & 0x00000200) << 8
-			| (addr & 0x00000400) >> 4
-			| (addr & 0x00000800) << 4
-			| (addr & 0x00001000) >> 1
-			| (addr & 0x00002000) << 3
-			| (addr & 0x00004000) >> 6
-			| (addr & 0x00008000) >> 10
-			| (addr & 0x00010000) >> 4
-			| (addr & 0x00020000) >> 10
-			| (addr & 0x00040000) >> 4
-			| (addr & 0xFFF80000);
-	} else {
-		return    (addr & 0x00000002) << 3
-			| (addr & 0x00000010) >> 3
-			| (addr & 0x00000020) << 8
-			| (addr & 0x00000040) << 1
-			| (addr & 0x00000080) << 5
-			| (addr & 0x00000100) >> 3
-			| (addr & 0x00000200) << 1
-			| (addr & 0x00000400) << 6
-			| (addr & 0x00000800) >> 2
-			| (addr & 0x00001000) >> 6
-			| (addr & 0x00002000) >> 5
-			| (addr & 0x00008000) << 2
-			| (addr & 0x00010000) >> 5
-			| (addr & 0x00020000) >> 2
-			| (addr & 0xFFFC400D);
-	}
+	return    (addr & 0x00000001) << 2
+		| (addr & 0x00001002) >> 1
+		| (addr & 0x0000000C) << 1
+		| (addr & 0x00000010) >> 3
+		| (addr & 0x00000820) << 4
+		| (addr & 0x00000040) << 7
+		| (addr & 0x00002080) << 3
+		| (addr & 0x00000100) << 10
+		| (addr & 0x00000200) << 8
+		| (addr & 0x00050400) >> 4
+		| (addr & 0x00004000) >> 6
+		| (addr & 0x00028000) >> 10
+		| (addr & 0xFFF80000);
+}
+
+static inline u32 scramble_addr16(const u32 addr)
+{
+	return    (addr & 0x00000002) << 3
+		| (addr & 0x00000110) >> 3
+		| (addr & 0x00000020) << 8
+		| (addr & 0x00000240) << 1
+		| (addr & 0x00000080) << 5
+		| (addr & 0x00000400) << 6
+		| (addr & 0x00020800) >> 2
+		| (addr & 0x00001000) >> 6
+		| (addr & 0x00012000) >> 5
+		| (addr & 0x00008000) << 2
+		| (addr & 0xFFFC400D);
 }
 
 int main(int argc, char** argv)
@@ -113,26 +91,38 @@ int main(int argc, char** argv)
 
 	// figure out ROM type: scramble first 32 bytes
 	for(size_t i = 0; i < 32; i++) {
-		u32 addr = scramble_addr(i, 8);
+		u32 addr = scramble_addr8(i);
 		u16 tmp = scramble_data8(buf[i]);
 		outbuf[addr] = tmp;
 	}
 
 	if(strncmp(outbuf, "Roland", 6)) {
 		if(strncmp(outbuf, "JP-800", 6)) {
-			// try again with 16bit
-			for(size_t i = 0; i < 32; i++) {
-				u32 addr = scramble_addr(i, 16);
-				u16 tmp = scramble_data16(buf[i]);
-				outbuf[addr] = tmp;
-			}
-			if(!strncmp(outbuf, "Roland", 6) &&
-					!strncmp(&outbuf[0xC], "O\xB0X", 3)) {
-				width = 16;
-				type = "SRX";
+			if(strncmp(outbuf, "RK-10E", 6)) {
+				// try again with 16bit
+				for(size_t i = 0; i < 32; i++) {
+					u32 addr = scramble_addr16(i);
+					u16 tmp = scramble_data16(buf[i]);
+					outbuf[addr] = tmp;
+				}
+				if(!strncmp(outbuf, "Roland", 6)) {
+					if(!strncmp(&outbuf[0xC], "O\xB0X", 3)) {
+						width = 16;
+						type = "SRX";
+					} else if(!strncmp(&outbuf[0x7], "XP-GS", 5)) {
+						width = 16;
+						type = "SC88";
+					} else {
+						printf("Unknown ROM type\n");
+						return 1;
+					}
+				} else {
+					printf("Unknown ROM type\n");
+					return 1;
+				}
 			} else {
-				printf("Unknown ROM type\n");
-				return 1;
+				width = 8;
+				type = "JD-990";
 			}
 		} else {
 			width = 8;
@@ -141,6 +131,9 @@ int main(int argc, char** argv)
 	} else if(!strncmp(&outbuf[0xC], "O\xB0S", 3)) {
 		width = 8;
 		type = "SR-JV80";
+	} else if(!strncmp(&outbuf[0x7], "JV80", 4)) {
+		width = 8;
+		type = "JV880";
 	} else {
 		printf("Unknown ROM type\n");
 		return 1;
@@ -184,14 +177,14 @@ int main(int argc, char** argv)
 		u16* buf16 = (u16*) buf;
 		u16* outbuf16 = (u16*) outbuf;
 		for(size_t i = 0; i < fsize; i += 2) {
-			u32 addr = scramble_addr(i, width);
+			u32 addr = scramble_addr16(i);
 			u16 tmp = scramble_data16(buf16[i >> 1]);
 			outbuf16[addr >> 1] = tmp;
 		}
 	} else {
 		// no optimization for 8bit ROMs, because A[0] is scrambled too
 		for(size_t i = 0; i < fsize; i++) {
-			u32 addr = scramble_addr(i, width);
+			u32 addr = scramble_addr8(i);
 			u16 tmp = scramble_data8(buf[i]);
 			outbuf[addr] = tmp;
 		}
